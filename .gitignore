@@ -54,3 +54,5 @@ grafana-storage/
 prometheus-storage/
 
 data/
+
+tools-monitoring/**.yml
