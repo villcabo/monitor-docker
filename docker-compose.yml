@@ -1,0 +1,61 @@
+name: monitor-docker
+
+networks:
+  network-app:
+    name: monitor-docker
+    driver: bridge
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: prometheus
+    restart: unless-stopped
+    user: "65534:65534"
+    networks:
+      - network-app
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=${PM_RETENTION_TIME:-365d}'
+      - '--storage.tsdb.retention.size=${PM_RETENTION_SIZE:-10GB}'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ${PM_FILE:-./prometheus/prometheus.yml}:/etc/prometheus/prometheus.yml
+      - ./data/prometheus:/prometheus
+    environment:
+      TZ: America/La_Paz
+    ports:
+      - ${PM_PORT:-0.0.0.0:9090}:9090
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: loki
+    restart: unless-stopped
+    user: "65534:65534"
+    networks:
+      - network-app
+    volumes:
+      - ${LOKI_CONFIG_FILE:-./loki/loki-config.yml}:/etc/loki/loki-config.yml
+      - ./data/loki:/loki
+    command: -config.file=/etc/loki/loki-config.yml -config.expand-env=true
+    ports:
+      - "${LOKI_PORT:-0.0.0.0:3100}:3100"
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: unless-stopped
+    user: "65534:65534"
+    networks:
+      - network-app
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      # Grafana SMTP
+      GF_SMTP_ENABLED: ${GF_SMTP_ENABLED:-false}
+      GF_SMTP_HOST: ${GF_SMTP_HOST:-localhost:587}
+      GF_SMTP_USER: ${GF_SMTP_USER:-your_user}
+      GF_SMTP_PASSWORD: ${GF_SMTP_PASSWORD:-your_password}
+    volumes:
+      - ./data/grafana-data:/var/lib/grafana
+      - ./data/grafana-provisioning/:/etc/grafana/provisioning/
+    ports:
+      - "${GF_PORT:-0.0.0.0:3000}:3000"
